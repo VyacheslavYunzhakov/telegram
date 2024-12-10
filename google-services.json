@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "838014663799",
+    "project_id": "telegram-f9c29",
+    "storage_bucket": "telegram-f9c29.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:838014663799:android:e3a68a42d9fda3fae39a72",
+        "android_client_info": {
+          "package_name": "org.telegram.messenger"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB88fNOmY0TsBmWfFxpljD9fgpf_dlCTTs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
