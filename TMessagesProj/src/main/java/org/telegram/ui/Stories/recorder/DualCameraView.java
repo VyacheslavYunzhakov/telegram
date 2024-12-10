@@ -40,6 +40,7 @@ import java.util.Locale;
 public class DualCameraView extends CameraView {
 
     private boolean dualAvailable;
+    public boolean fromChatAttachAlertPhotoLayout = false;
 
     public DualCameraView(Context context, boolean frontface, boolean lazy) {
         super(context, frontface, lazy);
@@ -48,6 +49,10 @@ public class DualCameraView extends CameraView {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (fromChatAttachAlertPhotoLayout) {
+            fromChatAttachAlertPhotoLayout = false;
+            return super.onTouchEvent(event);
+        }
         boolean r = touchEvent(event);
         return super.onTouchEvent(event) || r;
     }
