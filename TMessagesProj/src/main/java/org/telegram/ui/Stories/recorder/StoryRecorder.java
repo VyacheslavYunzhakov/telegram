@@ -1,5 +1,6 @@
 package org.telegram.ui.Stories.recorder;
 
+import static android.opengl.ETC1.getHeight;
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
 import static org.telegram.messenger.AndroidUtilities.touchSlop;
@@ -105,6 +106,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.VideoEditedInfo;
+import org.telegram.messenger.WindowViewAbstract;
 import org.telegram.messenger.camera.CameraController;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
@@ -1042,7 +1044,7 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
         }
     }
 
-    public class WindowView extends SizeNotifierFrameLayout {
+    public class WindowView extends WindowViewAbstract {
 
         private GestureDetectorFixDoubleTap gestureDetector;
         private ScaleGestureDetector scaleGestureDetector;
@@ -1602,6 +1604,7 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
             }
         }
 
+        @Override
         public void drawBlurBitmap(Bitmap bitmap, float amount) {
             Canvas canvas = new Canvas(bitmap);
             canvas.drawColor(0xff000000);
@@ -2286,7 +2289,7 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
             }
 
             @Override
-            protected boolean captionLimitToast() {
+            public boolean captionLimitToast() {
                 if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
                     return false;
                 }
