@@ -165,6 +165,7 @@ import org.telegram.ui.Stories.recorder.CollageLayoutButton;
 import org.telegram.ui.Stories.recorder.CollageLayoutView2;
 import org.telegram.ui.Stories.recorder.DownloadButton;
 import org.telegram.ui.Stories.recorder.DraftSavedHint;
+import org.telegram.ui.Stories.recorder.DraftsController;
 import org.telegram.ui.Stories.recorder.DualCameraView;
 import org.telegram.ui.Stories.recorder.FlashViews;
 import org.telegram.ui.Stories.recorder.GalleryListView;
@@ -1650,6 +1651,114 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         photoFilterView.init();
     }
 
+    public boolean onBackPressedChecked() {
+        if (cameraAnimationInProgress) {
+            return false;
+        }
+        if (captionEdit != null && captionEdit.stopRecording()) {
+            return false;
+        }
+        if (takingVideo) {
+            recordControl.stopRecording();
+            return false;
+        }
+        if (takingPhoto) {
+            return false;
+        }
+        if (captionEdit.onBackPressed()) {
+            return false;
+        } else if (themeSheet != null) {
+            themeSheet.dismiss();
+            return false;
+        } else if (galleryListView != null) {
+            if (galleryListView.onBackPressed()) {
+                return false;
+            }
+            animateGalleryListView(false);
+            lastGallerySelectedAlbum = null;
+            return false;
+        } else if (currentEditMode == EDIT_MODE_PAINT && paintView != null && paintView.onBackPressed()) {
+            return false;
+        } else if (currentEditMode > EDIT_MODE_NONE) {
+            switchToEditMode(EDIT_MODE_NONE, true);
+            return false;
+        } else if (currentPage == PAGE_CAMERA && collageLayoutView.hasContent()) {
+            collageLayoutView.clear(true);
+            updateActionBarButtons(true);
+            return false;
+        } else if (currentPage == PAGE_PREVIEW && (outputEntry == null || !outputEntry.isRepost && !outputEntry.isRepostMessage) && (outputEntry == null || !outputEntry.isEdit || (paintView != null && paintView.hasChanges()) || outputEntry.editedMedia || outputEntry.editedCaption)) {
+            if (paintView != null && paintView.onBackPressed()) {
+                return false;
+            } else if (botId == 0 && (fromGallery && !collageLayoutView.hasLayout() && (paintView == null || !paintView.hasChanges()) && (outputEntry == null || outputEntry.filterFile == null) || !previewButtons.isShareEnabled()) && (outputEntry == null || !outputEntry.isEdit || !outputEntry.isRepost && !outputEntry.isRepostMessage)) {
+                navigateTo(PAGE_CAMERA, true);
+            } else {
+                if (botId != 0) {
+                    close(true);
+                } else {
+                    showDismissEntry();
+                }
+            }
+            return false;
+        } else if (currentPage == PAGE_COVER && !(outputEntry == null || outputEntry.isEditingCover)) {
+            processDone();
+            navigateTo(PAGE_PREVIEW, true);
+            return false;
+        } else {
+            close(true);
+            closeCamera(true);
+            return true;
+        }
+    }
+
+    private void showDismissEntry() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext(), resourcesProvider);
+        builder.setTitle(getString(R.string.DiscardChanges));
+        builder.setMessage(getString(R.string.PhotoEditorDiscardAlert));
+        if (outputEntry != null && !outputEntry.isEdit) {
+            builder.setNeutralButton(getString(outputEntry.isDraft ? R.string.StoryKeepDraft : R.string.StorySaveDraft), (di, i) -> {
+                if (outputEntry == null) {
+                    return;
+                }
+                outputEntry.captionEntitiesAllowed = MessagesController.getInstance(currentAccount).storyEntitiesAllowed();
+                showSavedDraftHint = !outputEntry.isDraft;
+                applyFilter(null);
+                applyPaint();
+                applyPaintMessage();
+                destroyPhotoFilterView();
+                StoryEntry storyEntry = outputEntry;
+                storyEntry.destroy(true);
+                storyEntry.caption = captionEdit.getText();
+                outputEntry = null;
+                DraftsController drafts = MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController();
+                if (storyEntry.isDraft) {
+                    drafts.edit(storyEntry);
+                } else {
+                    drafts.append(storyEntry);
+                }
+                navigateTo(PAGE_CAMERA, true);
+            });
+        }
+        builder.setPositiveButton(outputEntry != null && outputEntry.isDraft && !outputEntry.isEdit ? getString(R.string.StoryDeleteDraft) : getString(R.string.Discard), (dialogInterface, i) -> {
+            if (outputEntry != null && !(outputEntry.isEdit || outputEntry.isRepost && !outputEntry.isRepostMessage) && outputEntry.isDraft) {
+                MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController().delete(outputEntry);
+                outputEntry = null;
+            }
+            if (outputEntry != null && (outputEntry.isEdit || outputEntry.isRepost && !outputEntry.isRepostMessage)) {
+                close(true);
+            } else {
+                navigateTo(PAGE_CAMERA, true);
+            }
+        });
+        builder.setNegativeButton(getString(R.string.Cancel), null);
+        AlertDialog dialog = builder.create();
+        dialog.show();
+        View positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        if (positiveButton instanceof TextView) {
+            ((TextView) positiveButton).setTextColor(Theme.getColor(Theme.key_text_RedBold, resourcesProvider));
+            positiveButton.setBackground(Theme.createRadSelectorDrawable(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_text_RedBold, resourcesProvider), (int) (0.2f * 255)), 6, 6));
+        }
+    }
+
     private boolean noCameraPermission;
     @SuppressLint("ClickableViewAccessibility")
     private void initViews() {
@@ -2255,14 +2364,14 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         backButton = new FlashViews.ImageViewInvertable(context);
         backButton.setContentDescription(getString(R.string.AccDescrGoBack));
         backButton.setScaleType(ImageView.ScaleType.CENTER);
-        backButton.setImageResource(R.drawable.msg_photo_back);
+        backButton.setImageResource(R.drawable.ic_close_white);
         backButton.setColorFilter(new PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.MULTIPLY));
         backButton.setBackground(Theme.createSelectorDrawable(0x20ffffff));
         backButton.setOnClickListener(e -> {
             if (awaitingPlayer) {
                 return;
             }
-            onBackPressed();
+            onBackPressedChecked();
         });
         actionBarContainer.addView(backButton, LayoutHelper.createFrame(56, 56, Gravity.TOP | Gravity.LEFT));
         flashViews.add(backButton);
@@ -5384,7 +5493,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         public boolean dispatchKeyEventPreIme(KeyEvent event) {
             if (event != null && event.getKeyCode()
                     == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
-                onBackPressed();
+                onBackPressedChecked();
                 return true;
             }
             return super.dispatchKeyEventPreIme(event);
