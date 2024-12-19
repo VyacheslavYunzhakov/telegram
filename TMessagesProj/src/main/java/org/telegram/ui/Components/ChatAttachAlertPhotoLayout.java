@@ -3476,6 +3476,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         if (captionEdit != null) {
             captionEdit.ignoreTouches = toPage != PAGE_PREVIEW;
         }
+        if (toPage == PAGE_CAMERA) {
+            cameraView.resetCamera();
+        }
 
         if (toPage == PAGE_PREVIEW) {
             MediaDataController.getInstance(currentAccount).checkStickers(MediaDataController.TYPE_IMAGE);
