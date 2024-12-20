@@ -2553,14 +2553,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         collageRemoveButton.setVisibility(View.GONE);
         collageRemoveButton.setAlpha(0.0f);
         collageRemoveButton.setOnClickListener(v -> {
-            collageLayoutView.setLayout(null, true);
-            collageLayoutView.clear(true);
-            collageListView.setSelected(null);
-            if (cameraView != null) {
-                cameraView.recordHevc = !collageLayoutView.hasLayout();
-            }
-            collageListView.setVisible(false, true);
-            updateActionBarButtons(true);
+            removeCollage();
         });
         flashViews.add(collageRemoveButton);
         actionBarContainer.addView(collageRemoveButton, LayoutHelper.createFrame(56, 56, Gravity.TOP | Gravity.RIGHT));
@@ -2739,6 +2732,17 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         previewHighlight = new PreviewHighlightView(context, currentAccount, resourcesProvider);
         previewContainer.addView(previewHighlight, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         updateActionBarButtonsOffsets();
+    }
+
+    private void removeCollage() {
+        collageLayoutView.setLayout(null, true);
+        collageLayoutView.clear(true);
+        collageListView.setSelected(null);
+        if (cameraView != null) {
+            cameraView.recordHevc = !collageLayoutView.hasLayout();
+        }
+        collageListView.setVisible(false, true);
+        updateActionBarButtons(true);
     }
 
     private void updateActionBarButtonsOffsets() {
@@ -7651,6 +7655,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             return;
         }
         cameraView.fromChatAttachAlertPhotoLayout = true;
+        removeCollage();
 
         animateCameraValues[1] = itemSize;
         animateCameraValues[2] = itemSize;
