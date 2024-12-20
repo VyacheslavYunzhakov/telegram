@@ -2606,6 +2606,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
 
         recordControl = new RecordControl(context);
+        recordControl.STOP_WHEN_MAX_DURATION = false;
         recordControl.setDelegate(recordControlDelegate);
         recordControl.startAsVideo(isVideo);
         controlContainer.addView(recordControl, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 100, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL));
@@ -4085,6 +4086,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             if (cameraView == null) {
                 return;
             }
+            recordControl.SHOW_PROGRESS = byLongPress;
             CameraController.getInstance().recordVideo(cameraView.getCameraSessionObject(), outputFile, false, (thumbPath, duration) -> {
                 if (recordControl != null) {
                     recordControl.stopRecordingLoading(true);

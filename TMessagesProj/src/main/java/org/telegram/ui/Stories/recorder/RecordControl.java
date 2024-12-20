@@ -53,6 +53,8 @@ import java.util.ArrayList;
 
 public class RecordControl extends View implements FlashViews.Invertable {
 
+    public static boolean SHOW_PROGRESS = true;
+
     public interface Delegate {
         void onPhotoShoot();
         void onVideoRecordStart(boolean byLongPress, Runnable whenStarted);
@@ -118,6 +120,7 @@ public class RecordControl extends View implements FlashViews.Invertable {
     private final AnimatedFloat dualT = new AnimatedFloat(this, 0, 330, CubicBezierInterpolator.EASE_OUT_QUINT);
 
     private static final long MAX_DURATION = 60 * 1000L;
+    public boolean STOP_WHEN_MAX_DURATION = true;
     private long recordingStart;
     private long lastDuration;
 
@@ -441,9 +444,9 @@ public class RecordControl extends View implements FlashViews.Invertable {
         outlineFilledPaint.setStrokeWidth(strokeWidth);
         outlineFilledPaint.setAlpha((int) (0xFF * Math.max(.7f * recordingLoading, 1f - recordEndT)));
 
-        if (recordingLoading <= 0) {
+        if (recordingLoading <= 0 && SHOW_PROGRESS) {
             canvas.drawArc(AndroidUtilities.rectTmp, -90, sweepAngle, false, outlineFilledPaint);
-        } else {
+        } else if (SHOW_PROGRESS){
             final long now = SystemClock.elapsedRealtime();
             CircularProgressDrawable.getSegments((now - recordingLoadingStart) % 5400, loadingSegments);
             invalidate();
@@ -466,7 +469,7 @@ public class RecordControl extends View implements FlashViews.Invertable {
             if (duration / 1000L != lastDuration / 1000L) {
                 delegate.onVideoDuration(duration / 1000L);
             }
-            if (duration >= MAX_DURATION) {
+            if (duration >= MAX_DURATION && STOP_WHEN_MAX_DURATION) {
                 post(() -> {
                     recording = false;
                     longpressRecording = false;
