@@ -2535,6 +2535,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
 
         recordControl = new RecordControl(context);
+        recordControl.updateGalleryImage();
         recordControl.STOP_WHEN_MAX_DURATION = false;
         recordControl.setDelegate(recordControlDelegate);
         recordControl.startAsVideo(isVideo);
@@ -7052,6 +7053,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             cameraView.showTexture(true, animated);
         }
         AndroidUtilities.lockOrientation(parentAlert.baseFragment.getParentActivity(), ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        recordControl.updateGalleryImage();
     }
 
     public void loadGalleryPhotos() {
