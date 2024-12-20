@@ -3919,9 +3919,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
         private void takePicture(Utilities.Callback<Runnable> done) {
             boolean savedFromTextureView = false;
-            if (!useDisplayFlashlight()) {
-                cameraView.startTakePictureAnimation(true);
-            }
             if (cameraView.isDual() && TextUtils.equals(cameraView.getCameraSession().getCurrentFlashMode(), Camera.Parameters.FLASH_MODE_OFF) || collageLayoutView.hasLayout()) {
                 if (!collageLayoutView.hasLayout()) {
                     cameraView.pauseAsTakingPicture();
@@ -3936,69 +3933,34 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 bitmap.recycle();
             }
             if (!savedFromTextureView) {
-                takingPhoto = CameraController.getInstance().takePicture(outputFile, true, cameraView.getCameraSessionObject(), (orientation) -> {
-                    if (useDisplayFlashlight()) {
-                        try {
-                            windowView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
-                        } catch (Exception ignore) {}
-                    }
+                if (!photoEnabled) {
+                    BulletinFactory.of(cameraView, resourcesProvider).createErrorBulletin(LocaleController.getString(R.string.GlobalAttachPhotoRestricted)).show();
+                    return;
+                }
+                final File cameraFile = AndroidUtilities.generatePicturePath(parentAlert.baseFragment instanceof ChatActivity && ((ChatActivity) parentAlert.baseFragment).isSecretChat(), null);
+                final boolean sameTakePictureOrientation = cameraView.getCameraSession().isSameTakePictureOrientation();
+                cameraView.getCameraSession().setFlipFront(parentAlert.baseFragment instanceof ChatActivity || parentAlert.avatarPicker == 2);
+                takingPhoto = CameraController.getInstance().takePicture(cameraFile, false, cameraView.getCameraSessionObject(), (orientation) -> {
                     takingPhoto = false;
-                    if (outputFile == null) {
+                    if (cameraFile == null || parentAlert.destroyed) {
                         return;
                     }
-                    int w = -1, h = -1;
+//                    Pair<Integer, Integer> orientation = AndroidUtilities.getImageOrientation(cameraFile);
+                    mediaFromExternalCamera = false;
+                    int width = 0, height = 0;
                     try {
-                        BitmapFactory.Options opts = new BitmapFactory.Options();
-                        opts.inJustDecodeBounds = true;
-                        BitmapFactory.decodeFile(outputFile.getAbsolutePath(), opts);
-                        w = opts.outWidth;
-                        h = opts.outHeight;
-                    } catch (Exception ignore) {}
-
-                    int rotate = orientation == -1 ? 0 : 90;
-                    if (orientation == -1) {
-                        if (w > h) {
-                            rotate = 270;
-                        }
-                    } else if (h > w && rotate != 0) {
-                        rotate = 0;
+                        BitmapFactory.Options options = new BitmapFactory.Options();
+                        options.inJustDecodeBounds = true;
+                        BitmapFactory.decodeFile(new File(cameraFile.getAbsolutePath()).getAbsolutePath(), options);
+                        width = options.outWidth;
+                        height = options.outHeight;
+                    } catch (Exception ignore) {
                     }
-                    StoryEntry entry = StoryEntry.fromPhotoShoot(outputFile, rotate);
-                    if (entry != null) {
-                        entry.botId = botId;
-                        entry.botLang = botLang;
-                    }
-                    if (collageLayoutView.hasLayout()) {
-                        outputFile = null;
-                        if (collageLayoutView.push(entry)) {
-                            outputEntry = StoryEntry.asCollage(collageLayoutView.getLayout(), collageLayoutView.getContent());
-                            StoryPrivacySelector.applySaved(currentAccount, outputEntry);
-                            fromGallery = false;
-
-                            if (done != null) {
-                                done.run(null);
-                            }
-//                            if (done != null) {
-//                                done.run(() -> navigateTo(PAGE_PREVIEW, true));
-//                            } else {
-//                                navigateTo(PAGE_PREVIEW, true);
-//                            }
-                        } else if (done != null) {
-                            done.run(null);
-                        }
-                        updateActionBarButtons(true);
-                    } else {
-                        outputEntry = entry;
-                        StoryPrivacySelector.applySaved(currentAccount, outputEntry);
-                        fromGallery = false;
-
-                        if (done != null) {
-                            done.run(() -> navigateTo(PAGE_PREVIEW, true));
-                        } else {
-                            navigateTo(PAGE_PREVIEW, true);
-                        }
-                    }
+                    MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId--, 0, cameraFile.getAbsolutePath(), orientation == -1 ? 0 : orientation, false, width, height, 0);
+                    photoEntry.canDeleteAfter = true;
+                    openPhotoViewer(photoEntry, sameTakePictureOrientation, false);
                 });
+                cameraView.startTakePictureAnimation(true);
             } else {
                 takingPhoto = false;
                 final StoryEntry entry = StoryEntry.fromPhotoShoot(outputFile, 0);
@@ -4024,14 +3986,20 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     updateActionBarButtons(true);
                 } else {
                     outputEntry = entry;
-                    StoryPrivacySelector.applySaved(currentAccount, outputEntry);
                     fromGallery = false;
-
-                    if (done != null) {
-                        done.run(() -> navigateTo(PAGE_PREVIEW, true));
-                    } else {
-                        navigateTo(PAGE_PREVIEW, true);
+                    mediaFromExternalCamera = false;
+                    int width = 0, height = 0;
+                    try {
+                        BitmapFactory.Options options = new BitmapFactory.Options();
+                        options.inJustDecodeBounds = true;
+                        BitmapFactory.decodeFile(new File(outputFile.getAbsolutePath()).getAbsolutePath(), options);
+                        width = options.outWidth;
+                        height = options.outHeight;
+                    } catch (Exception ignore) {
                     }
+                    MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId--, 0, outputFile.getAbsolutePath(), entry.orientation == -1 ? 0 : entry.orientation, false, width, height, 0);
+                    photoEntry.canDeleteAfter = true;
+                    openPhotoViewer(photoEntry, false, false);
                 }
             }
         }
@@ -7655,7 +7623,17 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             return;
         }
         cameraView.fromChatAttachAlertPhotoLayout = true;
+
         removeCollage();
+        cameraView.toggleDual();
+        dualButton.setValue(cameraView.isDual());
+
+        dualHint.hide();
+        MessagesController.getGlobalMainSettings().edit().putInt("storydualhint", 2).apply();
+        if (savedDualHint.shown()) {
+            MessagesController.getGlobalMainSettings().edit().putInt("storysvddualhint", 2).apply();
+        }
+        savedDualHint.hide();
 
         animateCameraValues[1] = itemSize;
         animateCameraValues[2] = itemSize;
