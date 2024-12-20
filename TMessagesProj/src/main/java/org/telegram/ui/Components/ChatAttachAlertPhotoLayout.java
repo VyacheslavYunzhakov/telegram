@@ -1640,44 +1640,44 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         photoFilterView.init();
     }
 
-    public boolean onBackPressedChecked() {
+    public boolean onBackPressed() {
         if (cameraAnimationInProgress) {
-            return false;
+            return true;
         }
         if (captionEdit != null && captionEdit.stopRecording()) {
-            return false;
+            return true;
         }
         if (takingVideo) {
             recordControl.stopRecording();
-            return false;
+            return true;
         }
         if (takingPhoto) {
-            return false;
+            return true;
         }
         if (captionEdit.onBackPressed()) {
             return false;
         } else if (themeSheet != null) {
             themeSheet.dismiss();
-            return false;
+            return true;
         } else if (galleryListView != null) {
             if (galleryListView.onBackPressed()) {
-                return false;
+                return true;
             }
             animateGalleryListView(false);
             lastGallerySelectedAlbum = null;
-            return false;
+            return true;
         } else if (currentEditMode == EDIT_MODE_PAINT && paintView != null && paintView.onBackPressed()) {
-            return false;
+            return true;
         } else if (currentEditMode > EDIT_MODE_NONE) {
             switchToEditMode(EDIT_MODE_NONE, true);
-            return false;
+            return true;
         } else if (currentPage == PAGE_CAMERA && collageLayoutView.hasContent()) {
             collageLayoutView.clear(true);
             updateActionBarButtons(true);
-            return false;
+            return true;
         } else if (currentPage == PAGE_PREVIEW && (outputEntry == null || !outputEntry.isRepost && !outputEntry.isRepostMessage) && (outputEntry == null || !outputEntry.isEdit || (paintView != null && paintView.hasChanges()) || outputEntry.editedMedia || outputEntry.editedCaption)) {
             if (paintView != null && paintView.onBackPressed()) {
-                return false;
+                return true;
             } else if (botId == 0 && (fromGallery && !collageLayoutView.hasLayout() && (paintView == null || !paintView.hasChanges()) && (outputEntry == null || outputEntry.filterFile == null) || !previewButtons.isShareEnabled()) && (outputEntry == null || !outputEntry.isEdit || !outputEntry.isRepost && !outputEntry.isRepostMessage)) {
                 navigateTo(PAGE_CAMERA, true);
             } else {
@@ -1687,15 +1687,19 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     showDismissEntry();
                 }
             }
-            return false;
+            return true;
         } else if (currentPage == PAGE_COVER && !(outputEntry == null || outputEntry.isEditingCover)) {
             processDone();
             navigateTo(PAGE_PREVIEW, true);
-            return false;
-        } else {
-            close(true);
-            closeCamera(true);
             return true;
+        } else {
+            if (!cameraOpened) {
+                return super.onBackPressed();
+            } else {
+                close(true);
+                closeCamera(true);
+                return true;
+            }
         }
     }
 
@@ -2360,7 +2364,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             if (awaitingPlayer) {
                 return;
             }
-            onBackPressedChecked();
+            onBackPressed();
         });
         actionBarContainer.addView(backButton, LayoutHelper.createFrame(56, 56, Gravity.TOP | Gravity.LEFT));
         flashViews.add(backButton);
@@ -5485,7 +5489,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         public boolean dispatchKeyEventPreIme(KeyEvent event) {
             if (event != null && event.getKeyCode()
                     == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
-                onBackPressedChecked();
+                onBackPressed();
                 return true;
             }
             return super.dispatchKeyEventPreIme(event);
@@ -7474,10 +7478,11 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     float additionCloseCameraY;
 
     public void closeCamera(boolean animated) {
-        cameraView.fromChatAttachAlertPhotoLayout = true;
         if (takingPhoto || cameraView == null) {
             return;
         }
+        cameraView.fromChatAttachAlertPhotoLayout = true;
+
         animateCameraValues[1] = itemSize;
         animateCameraValues[2] = itemSize;
         if (zoomControlHideRunnable != null) {
