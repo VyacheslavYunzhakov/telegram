@@ -334,6 +334,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     private WindowView windowView;
     private FrameLayout actionBarContainer;
     private int insetLeft, insetTop, insetRight, insetBottom;
+    private int insetBottomAdjusted,insetTopAdjusted;
     private int flashButtonResId;
     private ContainerView containerView;
 
@@ -1310,8 +1311,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 int bottomMargin = (int) (90 * getContext().getResources().getDisplayMetrics().density);
 
                 // Adjust layout boundaries
-                final int insetTopAdjusted = underStatusBar ? insetTop + topMargin : topMargin;
-                final int insetBottomAdjusted = bottom - top - bottomMargin;
+                insetTopAdjusted = underStatusBar ? insetTop + topMargin : topMargin;
+                insetBottomAdjusted = bottom - top - bottomMargin;
 
                 final int w = right - left;
                 final int h = insetBottomAdjusted - insetTopAdjusted;
@@ -1455,13 +1456,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             super.invalidate();
         }
 
-        private static final int CAMERA_PANEL_TOP_MARGIN_DP = 48;
-        private static final int CAMERA_PANEL_BOTTOM_MARGIN_DP = 100;
-
-        // Convert dp to pixels
-        private final int cameraPanelTopMargin = dp(CAMERA_PANEL_TOP_MARGIN_DP);
-        private final int cameraPanelBottomMargin = dp(CAMERA_PANEL_BOTTOM_MARGIN_DP);
-
         private float translationY1;
         private float translationY2;
 
@@ -1500,7 +1494,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             previewContainer.layout(0, 0, previewW, previewH);
             previewContainer.setPivotX(previewW * .5f);
             cameraPanel.layout(0, 0, previewW, previewH);
-            captionContainer.layout(0, 0, previewW, previewH);
+            captionContainer.layout(0, insetBottomAdjusted - previewH, previewW, insetBottomAdjusted);
             if (captionEditOverlay != null) {
                 captionEditOverlay.layout(0, 0, w, h);
             }
