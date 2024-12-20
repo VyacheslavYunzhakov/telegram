@@ -1639,9 +1639,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         if (cameraAnimationInProgress) {
             return true;
         }
-        if (captionEdit != null && captionEdit.stopRecording()) {
-            return true;
-        }
         if (takingVideo) {
             recordControl.stopRecording();
             return true;
@@ -1649,9 +1646,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         if (takingPhoto) {
             return true;
         }
-        if (captionEdit.onBackPressed()) {
-            return false;
-        } else if (themeSheet != null) {
+        if (themeSheet != null) {
             themeSheet.dismiss();
             return true;
         } else if (galleryListView != null) {
@@ -1670,23 +1665,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             collageLayoutView.clear(true);
             updateActionBarButtons(true);
             return true;
-        } else if (currentPage == PAGE_PREVIEW && (outputEntry == null || !outputEntry.isRepost && !outputEntry.isRepostMessage) && (outputEntry == null || !outputEntry.isEdit || (paintView != null && paintView.hasChanges()) || outputEntry.editedMedia || outputEntry.editedCaption)) {
-            if (paintView != null && paintView.onBackPressed()) {
-                return true;
-            } else if (botId == 0 && (fromGallery && !collageLayoutView.hasLayout() && (paintView == null || !paintView.hasChanges()) && (outputEntry == null || outputEntry.filterFile == null) || !previewButtons.isShareEnabled()) && (outputEntry == null || !outputEntry.isEdit || !outputEntry.isRepost && !outputEntry.isRepostMessage)) {
-                navigateTo(PAGE_CAMERA, true);
-            } else {
-                if (botId != 0) {
-                    close(true);
-                } else {
-                    showDismissEntry();
-                }
-            }
-            return true;
-        } else if (currentPage == PAGE_COVER && !(outputEntry == null || outputEntry.isEditingCover)) {
-            processDone();
-            navigateTo(PAGE_PREVIEW, true);
-            return true;
         } else {
             if (!cameraOpened) {
                 return super.onBackPressed();
@@ -1695,55 +1673,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 closeCamera(true);
                 return true;
             }
-        }
-    }
-
-    private void showDismissEntry() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext(), resourcesProvider);
-        builder.setTitle(getString(R.string.DiscardChanges));
-        builder.setMessage(getString(R.string.PhotoEditorDiscardAlert));
-        if (outputEntry != null && !outputEntry.isEdit) {
-            builder.setNeutralButton(getString(outputEntry.isDraft ? R.string.StoryKeepDraft : R.string.StorySaveDraft), (di, i) -> {
-                if (outputEntry == null) {
-                    return;
-                }
-                outputEntry.captionEntitiesAllowed = MessagesController.getInstance(currentAccount).storyEntitiesAllowed();
-                showSavedDraftHint = !outputEntry.isDraft;
-                applyFilter(null);
-                applyPaint();
-                applyPaintMessage();
-                destroyPhotoFilterView();
-                StoryEntry storyEntry = outputEntry;
-                storyEntry.destroy(true);
-                storyEntry.caption = captionEdit.getText();
-                outputEntry = null;
-                DraftsController drafts = MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController();
-                if (storyEntry.isDraft) {
-                    drafts.edit(storyEntry);
-                } else {
-                    drafts.append(storyEntry);
-                }
-                navigateTo(PAGE_CAMERA, true);
-            });
-        }
-        builder.setPositiveButton(outputEntry != null && outputEntry.isDraft && !outputEntry.isEdit ? getString(R.string.StoryDeleteDraft) : getString(R.string.Discard), (dialogInterface, i) -> {
-            if (outputEntry != null && !(outputEntry.isEdit || outputEntry.isRepost && !outputEntry.isRepostMessage) && outputEntry.isDraft) {
-                MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController().delete(outputEntry);
-                outputEntry = null;
-            }
-            if (outputEntry != null && (outputEntry.isEdit || outputEntry.isRepost && !outputEntry.isRepostMessage)) {
-                close(true);
-            } else {
-                navigateTo(PAGE_CAMERA, true);
-            }
-        });
-        builder.setNegativeButton(getString(R.string.Cancel), null);
-        AlertDialog dialog = builder.create();
-        dialog.show();
-        View positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-        if (positiveButton instanceof TextView) {
-            ((TextView) positiveButton).setTextColor(Theme.getColor(Theme.key_text_RedBold, resourcesProvider));
-            positiveButton.setBackground(Theme.createRadSelectorDrawable(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_text_RedBold, resourcesProvider), (int) (0.2f * 255)), 6, 6));
         }
     }
 
