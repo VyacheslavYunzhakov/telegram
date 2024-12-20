@@ -196,6 +196,7 @@ import org.webrtc.EglBase14;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -3662,6 +3663,50 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         return themeButton;
     }
 
+    private File prepareThumb(StoryEntry storyEntry, boolean forDraft) {
+        if (storyEntry == null) {
+            return null;
+        }
+        File file = forDraft ? storyEntry.draftThumbFile : storyEntry.uploadThumbFile;
+        if (file != null) {
+            file.delete();
+            file = null;
+        }
+
+        View previewView = collageLayoutView.hasLayout() ? collageLayoutView : this.previewView;
+
+        final float scale = forDraft ? 1 / 3f : 1f;
+        final int w = (int) (previewView.getWidth() * scale);
+        final int h = (int) (previewView.getHeight() * scale);
+        Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565);
+        Canvas canvas = new Canvas(bitmap);
+
+        canvas.save();
+        canvas.scale(scale, scale);
+        AndroidUtilities.makingGlobalBlurBitmap = true;
+        previewView.draw(canvas);
+        AndroidUtilities.makingGlobalBlurBitmap = false;
+        canvas.restore();
+
+        Bitmap thumbBitmap = Bitmap.createScaledBitmap(bitmap, 40, 22, true);
+
+        file = StoryEntry.makeCacheFile(currentAccount, false);
+        try {
+            bitmap.compress(Bitmap.CompressFormat.JPEG, forDraft ? 95 : 99, new FileOutputStream(file));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        bitmap.recycle();
+
+        if (forDraft) {
+            storyEntry.draftThumbFile = file;
+        } else {
+            storyEntry.uploadThumbFile = file;
+        }
+        storyEntry.thumbBitmap = thumbBitmap;
+        return file;
+    }
+
     public void updateThemeButtonDrawable(boolean animated) {
         if (themeButtonDrawable != null) {
             if (animated) {
@@ -3914,7 +3959,12 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 modeSwitcherView.switchMode(isVideo);
             }
             StoryPrivacySelector.applySaved(currentAccount, outputEntry);
-            navigateTo(PAGE_PREVIEW, true);
+//            navigateTo(PAGE_PREVIEW, true);
+            int width = outputEntry.width;
+            int height = outputEntry.height;
+            File file = prepareThumb(outputEntry, false);
+            MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId--, 0, file.getAbsolutePath(), 0, isVideo, width, height, 0);
+            openPhotoViewer(photoEntry, false, false);
         }
 
         private void takePicture(Utilities.Callback<Runnable> done) {
@@ -3975,11 +4025,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                         if (done != null) {
                             done.run(null);
                         }
-//                        if (done != null) {
-//                            done.run(() -> navigateTo(PAGE_PREVIEW, true));
-//                        } else {
-//                            navigateTo(PAGE_PREVIEW, true);
-//                        }
                     } else if (done != null) {
                         done.run(null);
                     }
@@ -4105,7 +4150,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     updateActionBarButtons(true);
                 } else {
                     outputEntry = entry;
-                    StoryPrivacySelector.applySaved(currentAccount, outputEntry);
                     fromGallery = false;
                     int width = cameraView.getVideoWidth(), height = cameraView.getVideoHeight();
                     if (width > 0 && height > 0) {
@@ -4114,7 +4158,25 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                         outputEntry.setupMatrix();
                     }
                     navigateToPreviewWithPlayerAwait(() -> {
-                        navigateTo(PAGE_PREVIEW, true);
+                        if (outputFile == null || parentAlert.destroyed || cameraView == null) {
+                            return;
+                        }
+                        mediaFromExternalCamera = false;
+                        try {
+                            BitmapFactory.Options options = new BitmapFactory.Options();
+                            options.inJustDecodeBounds = true;
+                            BitmapFactory.decodeFile(new File(thumbPath).getAbsolutePath(), options);
+                        } catch (Exception ignore) {}
+                        MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId--, 0, outputFile.getAbsolutePath(), 0, true, width, height, 0);
+                        photoEntry.duration = (int) (duration / 1000f);
+                        photoEntry.thumbPath = thumbPath;
+                        if (parentAlert.avatarPicker != 0 && cameraView.isFrontface()) {
+                            photoEntry.cropState = new MediaController.CropState();
+                            photoEntry.cropState.mirrored = true;
+                            photoEntry.cropState.freeform = false;
+                            photoEntry.cropState.lockedAspectRatio = 1.0f;
+                        }
+                        openPhotoViewer(photoEntry, false, false);
                     }, 0);
                 }
             }, () /* onVideoStart */ -> {
