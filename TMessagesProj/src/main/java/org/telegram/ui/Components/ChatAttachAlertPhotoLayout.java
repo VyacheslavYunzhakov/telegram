@@ -1333,7 +1333,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                         previewW,
                         insetBottomAdjusted + navbarContainer.getMeasuredHeight()
                 );
-                flashViews.foregroundView.layout(0, insetTopAdjusted, w, insetTopAdjusted + h);
+                flashViews.foregroundView.layout(0, 0, w, h + insetBottomAdjusted);
             }
             @Override
             protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -3048,7 +3048,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                         if (entry instanceof MediaController.PhotoEntry) {
                             StoryPrivacySelector.applySaved(currentAccount, outputEntry);
                         }
-                        navigateTo(PAGE_PREVIEW, true);
+                        openPhotoViewer((MediaController.PhotoEntry) entry, false, false);
                     }
                 } else if (entry instanceof StoryEntry) {
                     storyEntry = (StoryEntry) entry;
@@ -3069,7 +3069,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     if (entry instanceof MediaController.PhotoEntry) {
                         StoryPrivacySelector.applySaved(currentAccount, outputEntry);
                     }
-                    navigateTo(PAGE_PREVIEW, true);
+                    MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId--, 0, storyEntry.file.getAbsolutePath(), storyEntry.orientation == -1 ? 0 : storyEntry.orientation, false, storyEntry.width, storyEntry.height, 0);
+                    openPhotoViewer(photoEntry, false, false);
                 } else {
                     return;
                 }
