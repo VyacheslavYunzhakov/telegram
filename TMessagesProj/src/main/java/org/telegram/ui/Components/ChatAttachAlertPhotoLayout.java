@@ -1381,17 +1381,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             CameraController.getInstance().stopPreview(cameraView.getCameraSessionObject());
         });
 
-        zoomControlView = new ZoomControlView(context);
-        zoomControlView.setVisibility(View.GONE);
-        zoomControlView.setAlpha(0.0f);
-        container.addView(zoomControlView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 50, Gravity.LEFT | Gravity.TOP, 0, 0, 0, 100 + 16));
-        zoomControlView.setDelegate(zoom -> {
-            if (cameraView != null) {
-                cameraView.setZoom(cameraZoom = zoom);
-            }
-            showZoomControls(true, true);
-        });
-
         tooltipTextView = new TextView(context);
         tooltipTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         tooltipTextView.setTextColor(0xffffffff);
