@@ -2138,10 +2138,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             awaitingPlayer = false;
             open.run();
         };
-        previewView.setAlpha(0f);
-        previewView.setVisibility(View.VISIBLE);
-        previewView.set(outputEntry, afterPlayerAwait, seekTo);
-        previewView.setupAudio(outputEntry, false);
         AndroidUtilities.runOnUIThread(afterPlayerAwait, ms);
     }
 
@@ -3886,8 +3882,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     MeasureSpec.makeMeasureSpec(previewH + underControls, MeasureSpec.EXACTLY)
             );
             collageLayoutView.measure(
-                    MeasureSpec.makeMeasureSpec(previewW, MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(previewH + underControls, MeasureSpec.EXACTLY)
+                    MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
             );
             flashViews.backgroundView.measure(
                     MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
@@ -5739,6 +5735,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
         removeCollage();
         if (cameraView.isDual()) {
+            setActionBarButtonVisible(flashButton, false, animated);
             cameraView.toggleDual();
         }
         dualButton.setValue(cameraView.isDual());
