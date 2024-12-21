@@ -3736,12 +3736,10 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                         ty = Math.max(0, ty);
                     }
                     if (ty >= 0) {
-                        cameraPanel.setTranslationY(ty);
                         if (galleryListView != null) {
                             galleryListView.setTranslationY(galleryMax);
                         }
                     } else {
-                        cameraPanel.setTranslationY(0);
                         if (galleryListView == null) {
                             createGalleryListView();
                         }
@@ -3777,19 +3775,13 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 allowModeScroll = true;
                 boolean r = false;
                 if (scrollingY) {
-                    if (Math.abs(cameraPanel.getTranslationY()) >= dp(1)) {
-                        if (velocityY > 0 && Math.abs(velocityY) > 2000 && Math.abs(velocityY) > Math.abs(velocityX) || dismissProgress > .4f) {
-                            close(true);
-                        }
-                        r = true;
-                    } else if (galleryListView != null && !galleryClosing) {
+                    if (galleryListView != null && !galleryClosing) {
                         if (Math.abs(velocityY) > 200 && (!galleryListView.listView.canScrollVertically(-1) || !wasGalleryOpen)) {
                             animateGalleryListView(!takingVideo && velocityY < 0);
-                            r = true;
                         } else {
                             animateGalleryListView(!takingVideo && galleryListView.getTranslationY() < galleryListView.getPadding());
-                            r = true;
                         }
+                        r = true;
                     }
                 }
                 if (scrollingX) {
@@ -5268,6 +5260,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             cameraView.setRecordFile(AndroidUtilities.generateVideoPath(parentAlert.baseFragment instanceof ChatActivity && ((ChatActivity) parentAlert.baseFragment).isSecretChat()));
             cameraView.setFocusable(true);
             cameraView.setFpsLimit(30);
+            cameraView.isSavedDual()
 
             // Handle dual-camera availability
             setActionBarButtonVisible(dualButton, cameraView.dualAvailable(), true);
