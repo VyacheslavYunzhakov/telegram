@@ -99,7 +99,7 @@ import javax.microedition.khronos.egl.EGLSurface;
 public class CameraView extends FrameLayout implements TextureView.SurfaceTextureListener, CameraController.ICameraView, CameraController.ErrorCallback  {
 
     public boolean WRITE_TO_FILE_IN_BACKGROUND = false;
-
+    public boolean adjustDualCamera = false;
     public boolean isStory;
     public boolean recordHevc;
     private float scaleX, scaleY;
@@ -505,7 +505,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         pixelW = getMeasuredWidth();
         pixelH = getMeasuredHeight();
         if (pixelDualW <= 0) {
-            pixelDualW = getMeasuredWidth();
+            pixelDualW = adjustDualCamera ? getMeasuredWidth()/(16/9f): getMeasuredWidth();
             pixelDualH = getMeasuredHeight();
         }
     }

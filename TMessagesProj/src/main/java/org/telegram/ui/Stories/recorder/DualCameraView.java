@@ -179,9 +179,16 @@ public class DualCameraView extends CameraView {
             float h = getMeasuredHeight() * .43f;
             float px = Math.min(getMeasuredWidth(), getMeasuredWidth()) * .025f;
             float py = px * 2;
-
             matrix.postScale(w / getMeasuredWidth(), h / getMeasuredHeight());
-            matrix.postTranslate(getMeasuredWidth() - px - w, px);
+            if(!adjustDualCamera) {
+                matrix.postTranslate(getMeasuredWidth() - px - w, px);
+            } else {
+                float density = getResources().getDisplayMetrics().density;
+                float offsetX = 40 * density;
+                float offsetY = 20 * density;
+                matrix.postTranslate(getMeasuredWidth() - px - w - offsetX, py + offsetY);
+            }
+
             matrix.postConcat(toGL);
         }
         updateDualPosition();

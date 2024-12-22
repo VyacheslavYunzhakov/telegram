@@ -5253,6 +5253,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             };
 
             // Existing configurations
+            cameraView.adjustDualCamera = true;
             cameraView.fromChatAttachAlertPhotoLayout = true;
             if (cameraCell != null && lazy) {
                 cameraView.setThumbDrawable(cameraCell.getDrawable());
