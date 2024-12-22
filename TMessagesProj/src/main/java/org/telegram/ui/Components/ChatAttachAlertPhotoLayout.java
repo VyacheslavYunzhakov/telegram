@@ -12,6 +12,7 @@ import static android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
+import static org.telegram.messenger.AndroidUtilities.lerp;
 import static org.telegram.messenger.AndroidUtilities.touchSlop;
 import static org.telegram.messenger.LocaleController.formatPluralString;
 import static org.telegram.messenger.LocaleController.getString;
@@ -59,6 +60,8 @@ import android.text.Layout;
 import android.text.Spannable;
 
 import android.text.SpannableStringBuilder;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.Pair;
 import android.util.TypedValue;
@@ -82,6 +85,7 @@ import android.widget.TextView;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.dynamicanimation.animation.DynamicAnimation;
 import androidx.dynamicanimation.animation.SpringAnimation;
@@ -113,8 +117,10 @@ import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.VideoEditedInfo;
+import org.telegram.messenger.VideoEncodingService;
 import org.telegram.messenger.WindowViewAbstract;
 import org.telegram.messenger.camera.CameraController;
+import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -209,6 +215,18 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     private int alertOnlyOnce;
     private StoryPrivacyBottomSheet privacySheet;
     private ThanosEffect thanosEffect;
+
+    private FrameLayout containerForToast;
+    private BuildingVideo buildingVideo;
+    private boolean downloadingVideo;
+    private boolean preparing;
+    private  boolean downloading;
+    private final PreparingVideoToast toast = new PreparingVideoToast(getContext());
+    private Uri savedToGalleryUri;
+
+    TLRPC.TL_message message;
+    String path;
+    MessageObject messageObject;
 
     private Drawable cameraDrawable;
 
@@ -1305,6 +1323,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                         previewW,
                         insetBottomAdjusted + navbarContainer.getMeasuredHeight()
                 );
+                toast.layout(0, 0, w, bottom - top);
                 flashViews.foregroundView.layout(0, 0, w, h + insetBottomAdjusted);
                 captionContainer.layout(0, insetBottomAdjusted - previewH, previewW, insetBottomAdjusted);
                 if (captionEditOverlay != null) {
@@ -1327,7 +1346,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
                 for (int i = 0; i < getChildCount(); ++i) {
                     View child = getChildAt(i);
-                    if (child instanceof ItemOptions.DimView) {
+                    if (child instanceof PreparingVideoToast) {
+                        measureChildExactly(child, W, H);
+                    } else if (child instanceof ItemOptions.DimView) {
                         measureChildExactly(child, W, H);
                     }
                 }
@@ -1372,7 +1393,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         tooltipTextView.setShadowLayer(dp(3.33333f), 0, dp(0.666f), 0x4c000000);
         tooltipTextView.setPadding(dp(6), 0, dp(6), 0);
         cameraPanel.addView(tooltipTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, 0, 0, 16));
-
+//        cameraPanel.addView(toast);
+//        toast.hide();
         cameraPhotoRecyclerView = new RecyclerListView(context, resourcesProvider) {
             @Override
             public void requestLayout() {
@@ -1407,6 +1429,363 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         });
     }
 
+    public static class PreparingVideoToast extends View {
+
+        private final Paint dimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        private final TextPaint textPaint2 = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint whitePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint greyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        private final ButtonBounce cancelButton = new ButtonBounce(this);
+
+        private RLottieDrawable lottieDrawable;
+
+        private final StaticLayout preparingLayout;
+        private final float preparingLayoutWidth, preparingLayoutLeft;
+
+        private StaticLayout doneLayout;
+        private float doneLayoutWidth, doneLayoutLeft;
+
+        public PreparingVideoToast(Context context) {
+            this(context, LocaleController.getString(R.string.PreparingVideo));
+        }
+
+        public PreparingVideoToast(Context context, String text) {
+            super(context);
+
+            dimPaint.setColor(0x5a000000);
+            textPaint.setColor(0xffffffff);
+            textPaint2.setColor(0xffffffff);
+            backgroundPaint.setColor(0xcc282828);
+            whitePaint.setColor(0xffffffff);
+            greyPaint.setColor(0x33ffffff);
+
+            whitePaint.setStyle(Paint.Style.STROKE);
+            whitePaint.setStrokeCap(Paint.Cap.ROUND);
+            whitePaint.setStrokeWidth(dp(4));
+            greyPaint.setStyle(Paint.Style.STROKE);
+            greyPaint.setStrokeCap(Paint.Cap.ROUND);
+            greyPaint.setStrokeWidth(dp(4));
+
+            textPaint.setTextSize(dp(14));
+            textPaint2.setTextSize(dpf2(14.66f));
+
+            preparingLayout = new StaticLayout(text, textPaint, AndroidUtilities.displaySize.x, Layout.Alignment.ALIGN_NORMAL, 1f, 0, false);
+            preparingLayoutWidth = preparingLayout.getLineCount() > 0 ? preparingLayout.getLineWidth(0) : 0;
+            preparingLayoutLeft = preparingLayout.getLineCount() > 0 ? preparingLayout.getLineLeft(0) : 0;
+
+            show();
+        }
+
+        @Override
+        protected boolean verifyDrawable(@NonNull Drawable who) {
+            return who == lottieDrawable || super.verifyDrawable(who);
+        }
+
+        private boolean shown = false;
+        private final AnimatedFloat showT = new AnimatedFloat(0, this, 0, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
+
+        private boolean preparing = true;
+        private float progress = 0;
+        private final AnimatedFloat t = new AnimatedFloat(this);
+        private final AnimatedFloat progressT = new AnimatedFloat(this);
+
+        private final RectF prepareRect = new RectF();
+        private final RectF toastRect = new RectF();
+        private final RectF currentRect = new RectF();
+        private final RectF hiddenRect = new RectF();
+
+        private boolean deleted;
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            final int restore = canvas.getSaveCount();
+            final float showT = this.showT.set(shown ? 1 : 0);
+            final float t = this.t.set(preparing ? 0 : 1);
+
+            dimPaint.setAlpha((int) (0x5a * (1f - t) * showT));
+            canvas.drawRect(0, 0, getWidth(), getHeight(), dimPaint);
+
+            final float prepareWidth = Math.max(preparingLayoutWidth, dp(54)) + dp(21 + 21);
+            final float prepareHeight = dp(21 + 54 + 18 + 18) + preparingLayout.getHeight();
+            prepareRect.set(
+                    (getWidth() - prepareWidth) / 2f,
+                    (getHeight() - prepareHeight) / 2f,
+                    (getWidth() + prepareWidth) / 2f,
+                    (getHeight() + prepareHeight) / 2f
+            );
+
+            final float toastWidth = dp(9 + 36 + 7 + 22) + doneLayoutWidth;
+            final float toastHeight = dp(6 + 36 + 6);
+            toastRect.set(
+                    (getWidth() - toastWidth) / 2f,
+                    (getHeight() - toastHeight) / 2f,
+                    (getWidth() + toastWidth) / 2f,
+                    (getHeight() + toastHeight) / 2f
+            );
+
+            AndroidUtilities.lerp(prepareRect, toastRect, t, currentRect);
+            if (showT < 1 && preparing) {
+                hiddenRect.set(getWidth() / 2f, getHeight() / 2f, getWidth() / 2f, getHeight() / 2f);
+                AndroidUtilities.lerp(hiddenRect, currentRect, showT, currentRect);
+            }
+            if (showT < 1 && !preparing) {
+                canvas.scale(lerp(.8f, 1f, showT), lerp(.8f, 1f, showT), currentRect.centerX(), currentRect.centerY());
+            }
+            backgroundPaint.setAlpha((int) (0xcc * showT));
+            canvas.drawRoundRect(currentRect, dp(10), dp(10), backgroundPaint);
+            canvas.save();
+            canvas.clipRect(currentRect);
+            if (t < 1) {
+                drawPreparing(canvas, showT * (1f - t));
+            }
+            if (t > 0) {
+                drawToast(canvas, showT * t);
+            }
+            canvas.restoreToCount(restore);
+
+            if (showT <= 0 && !shown && !deleted) {
+                deleted = true;
+                post(() -> {
+                    if (getParent() instanceof ViewGroup) {
+                        ((ViewGroup) getParent()).removeView(this);
+                    }
+                });
+            }
+        }
+
+        public void cancel() {
+            if (onCancel != null) {
+                onCancel.run();
+            }
+        }
+
+        private void drawPreparing(Canvas canvas, float alpha) {
+            final float progress = this.progressT.set(this.progress);
+
+            final float cx = prepareRect.centerX();
+            final float cy = prepareRect.top + dp(21 + 27);
+            final float r = dp(25);
+
+            greyPaint.setAlpha((int) (0x33 * alpha));
+            canvas.drawCircle(cx, cy, r, greyPaint);
+            AndroidUtilities.rectTmp.set(cx - r, cy - r, cx + r, cy + r);
+            whitePaint.setAlpha((int) (0xFF * alpha));
+            whitePaint.setStrokeWidth(dp(4));
+            canvas.drawArc(AndroidUtilities.rectTmp, -90, progress * 360, false, whitePaint);
+
+            final float cancelButtonScale = cancelButton.getScale(.15f);
+            canvas.save();
+            canvas.scale(cancelButtonScale, cancelButtonScale, cx, cy);
+            whitePaint.setStrokeWidth(dp(3.4f));
+            canvas.drawLine(cx - dp(7), cy - dp(7), cx + dp(7), cy + dp(7), whitePaint);
+            canvas.drawLine(cx - dp(7), cy + dp(7), cx + dp(7), cy - dp(7), whitePaint);
+            canvas.restore();
+
+            canvas.save();
+            canvas.translate(
+                    prepareRect.left + dp(21) - preparingLayoutLeft,
+                    prepareRect.bottom - dp(18) - preparingLayout.getHeight()
+            );
+            textPaint.setAlpha((int) (0xFF * alpha));
+            preparingLayout.draw(canvas);
+            canvas.restore();
+        }
+
+        private void drawToast(Canvas canvas, float alpha) {
+            if (lottieDrawable != null) {
+                lottieDrawable.setAlpha((int) (0xFF * alpha));
+                lottieDrawable.setBounds(
+                        (int) (toastRect.left + dp(9)),
+                        (int) (toastRect.top + dp(6)),
+                        (int) (toastRect.left + dp(9 + 36)),
+                        (int) (toastRect.top + dp(6 + 36))
+                );
+                lottieDrawable.draw(canvas);
+            }
+
+            if (doneLayout != null) {
+                canvas.save();
+                canvas.translate(toastRect.left + dp(9 + 36 + 7) - doneLayoutLeft, toastRect.centerY() - doneLayout.getHeight() / 2f);
+                textPaint2.setAlpha((int) (0xFF * alpha));
+                doneLayout.draw(canvas);
+                canvas.restore();
+            }
+        }
+
+        public void setProgress(float progress) {
+            this.progress = progress;
+            invalidate();
+        }
+
+        public void setDone(int resId, CharSequence text, int delay) {
+            if (lottieDrawable != null) {
+                lottieDrawable.setCallback(null);
+                lottieDrawable.recycle(true);
+            }
+
+            lottieDrawable = new RLottieDrawable(resId, "" + resId, dp(36), dp(36));
+            lottieDrawable.setCallback(this);
+            lottieDrawable.start();
+
+            doneLayout = new StaticLayout(text, textPaint2, AndroidUtilities.displaySize.x, Layout.Alignment.ALIGN_NORMAL, 1f, 0, false);
+            doneLayoutWidth = doneLayout.getLineCount() > 0 ? doneLayout.getLineWidth(0) : 0;
+            doneLayoutLeft = doneLayout.getLineCount() > 0 ? doneLayout.getLineLeft(0) : 0;
+
+            preparing = false;
+            invalidate();
+            if (hideRunnable != null) {
+                AndroidUtilities.cancelRunOnUIThread(hideRunnable);
+            }
+            AndroidUtilities.runOnUIThread(hideRunnable = this::hide, delay);
+        }
+
+        private Runnable hideRunnable;
+        public void hide() {
+            if (hideRunnable != null) {
+                AndroidUtilities.cancelRunOnUIThread(hideRunnable);
+                hideRunnable = null;
+            }
+            this.shown = false;
+            invalidate();
+        }
+
+        public void show() {
+            this.shown = true;
+            invalidate();
+        }
+
+        private Runnable onCancel;
+        public void setOnCancelListener(Runnable onCancel) {
+            this.onCancel = onCancel;
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            boolean hit = currentRect.contains(event.getX(), event.getY());
+            if (event.getAction() == MotionEvent.ACTION_DOWN && (preparing || hit)) {
+                cancelButton.setPressed(hit);
+                return true;
+            } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                if (cancelButton.isPressed()) {
+                    if (hit) {
+                        if (preparing) {
+                            if (onCancel != null) {
+                                onCancel.run();
+                            }
+                        } else {
+                            hide();
+                        }
+                    }
+                    cancelButton.setPressed(false);
+                    return true;
+                }
+            } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                cancelButton.setPressed(false);
+                return true;
+            }
+            return super.onTouchEvent(event);
+        }
+    }
+
+    private static class BuildingVideo implements NotificationCenter.NotificationCenterDelegate {
+
+        final int currentAccount;
+        final StoryEntry entry;
+        final File file;
+
+        private MessageObject messageObject;
+        private final Runnable onDone;
+        private final Utilities.Callback<Float> onProgress;
+        private final Runnable onCancel;
+
+        public BuildingVideo(int account, StoryEntry entry, File file, @NonNull Runnable onDone, @Nullable Utilities.Callback<Float> onProgress, @NonNull Runnable onCancel) {
+            this.currentAccount = account;
+            this.entry = entry;
+            this.file = file;
+            this.onDone = onDone;
+            this.onProgress = onProgress;
+            this.onCancel = onCancel;
+
+            start();
+        }
+
+        public void start() {
+            if (messageObject != null) {
+                return;
+            }
+
+            NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingStarted);
+            NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileNewChunkAvailable);
+            NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingFailed);
+
+            TLRPC.TL_message message = new TLRPC.TL_message();
+            message.id = 1;
+            message.attachPath = file.getAbsolutePath();
+            messageObject = new MessageObject(currentAccount, message, (MessageObject) null, false, false);
+            entry.getVideoEditedInfo(info -> {
+                if (messageObject == null) {
+                    return;
+                }
+                messageObject.videoEditedInfo = info;
+                MediaController.getInstance().scheduleVideoConvert(messageObject);
+            });
+        }
+
+        public void stop(boolean cancel) {
+            if (messageObject == null) {
+                return;
+            }
+
+            NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.filePreparingStarted);
+            NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileNewChunkAvailable);
+            NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.filePreparingFailed);
+
+            if (cancel) {
+                MediaController.getInstance().cancelVideoConvert(messageObject);
+            }
+            messageObject = null;
+        }
+
+        @Override
+        public void didReceivedNotification(int id, int account, Object... args) {
+            if (id == NotificationCenter.filePreparingStarted) {
+                if ((MessageObject) args[0] == messageObject) {
+
+                }
+            } else if (id == NotificationCenter.fileNewChunkAvailable) {
+                if ((MessageObject) args[0] == messageObject) {
+                    String finalPath = (String) args[1];
+                    long availableSize = (Long) args[2];
+                    long finalSize = (Long) args[3];
+                    float progress = (float) args[4];
+
+                    if (onProgress != null) {
+                        onProgress.run(progress);
+                    }
+
+                    if (finalSize > 0) {
+                        onDone.run();
+                        VideoEncodingService.stop();
+                        stop(false);
+                    }
+                }
+            } else if (id == NotificationCenter.filePreparingFailed) {
+                if ((MessageObject) args[0] == messageObject) {
+                    stop(false);
+                    try {
+                        if (file != null) {
+                            file.delete();
+                        }
+                    } catch (Exception ignore) {}
+                    onCancel.run();
+                }
+            }
+        }
+    }
+
 
     public static final int EDIT_MODE_NONE = -1;
     public static final int EDIT_MODE_PAINT = 0;
@@ -1429,7 +1808,10 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         if (takingPhoto) {
             return true;
         }
-        if (themeSheet != null) {
+        if (downloading) {
+            toast.cancel();
+            return true;
+        } else if (themeSheet != null) {
             themeSheet.dismiss();
             return true;
         } else if (galleryListView != null) {
@@ -2700,11 +3082,64 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             }
             StoryPrivacySelector.applySaved(currentAccount, outputEntry);
 //            navigateTo(PAGE_PREVIEW, true);
-            int width = outputEntry.width;
-            int height = outputEntry.height;
-            File file = prepareThumb(outputEntry, false);
-            MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId--, 0, file.getAbsolutePath(), 0, isVideo, width, height, 0);
-            openPhotoViewer(photoEntry, false, false);
+            if (outputEntry.wouldBeVideo()) {
+                message = new TLRPC.TL_message();
+                message.id = 1;
+                path = message.attachPath = StoryEntry.makeCacheFile(currentAccount, true).getAbsolutePath();
+                messageObject = new MessageObject(currentAccount, message, (MessageObject) null, false, false);
+                toast.show();
+                outputEntry.getVideoEditedInfo(info -> {
+                    messageObject.videoEditedInfo = info;
+//                    duration = info.estimatedDuration / 1000L;
+                    if (messageObject.videoEditedInfo.needConvert()) {
+                        downloadingVideo = true;
+                        downloading = true;
+                        toast.setOnCancelListener(() -> {
+                            preparing = false;
+                            if (buildingVideo != null) {
+                                buildingVideo.stop(true);
+                                buildingVideo = null;
+                            }
+                            if (toast != null) {
+                                cameraPanel.removeView(toast);
+//                                toast.hide();
+                            }
+                            downloading = false;
+                        });
+                        cameraPanel.addView(toast);
+
+
+                        final File file = AndroidUtilities.generateVideoPath();
+                        buildingVideo = new BuildingVideo(currentAccount, outputEntry, file, () -> {
+                            if (!downloading || outputEntry == null) {
+                                return;
+                            }
+                            cameraPanel.removeView(toast);
+//                            toast.hide();
+                            downloading = false;
+                            MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId--, 0, file.getAbsolutePath(), 0, isVideo, outputEntry.width, outputEntry.height, 0);
+                            openPhotoViewer(photoEntry, false, false);
+
+                        }, progress -> {
+                            if (toast != null) {
+                                toast.setProgress(progress);
+                            }
+                        }, () -> {
+                            if (!downloading || outputEntry == null) {
+                                return;
+                            }
+                            toast.setDone(R.raw.error, LocaleController.getString("VideoConvertFail"), 3500);
+                            downloading = false;
+                        });
+                    }
+                });
+            } else {
+                int width = outputEntry.width;
+                int height = outputEntry.height;
+                File file = prepareThumb(outputEntry, false);
+                MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId--, 0, file.getAbsolutePath(), 0, isVideo, width, height, 0);
+                openPhotoViewer(photoEntry, false, false);
+            }
         }
 
         private void takePicture(Utilities.Callback<Runnable> done) {
@@ -3931,12 +4366,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
             for (int i = 0; i < getChildCount(); ++i) {
                 View child = getChildAt(i);
-                if (child instanceof DownloadButton.PreparingVideoToast) {
-                    child.measure(
-                            MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
-                            MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
-                    );
-                } else if (child instanceof Bulletin.ParentLayout) {
+                if (child instanceof Bulletin.ParentLayout) {
                     child.measure(
                             MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
                             MeasureSpec.makeMeasureSpec(Math.min(dp(340), H - (underStatusBar ? 0 : statusbar)), MeasureSpec.EXACTLY)
@@ -4006,9 +4436,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
             for (int i = 0; i < getChildCount(); ++i) {
                 View child = getChildAt(i);
-                if (child instanceof DownloadButton.PreparingVideoToast) {
-                    child.layout(0, 0, W, H);
-                } else if (child instanceof Bulletin.ParentLayout) {
+                if (child instanceof Bulletin.ParentLayout) {
                     child.layout(0, t, child.getMeasuredWidth(), t + child.getMeasuredHeight());
                 }
             }
