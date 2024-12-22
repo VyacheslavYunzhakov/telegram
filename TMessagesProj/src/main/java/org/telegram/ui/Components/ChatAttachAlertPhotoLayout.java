@@ -5736,7 +5736,29 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 cameraIcon = new FrameLayout(getContext()) {
                     @Override
                     protected void onDraw(Canvas canvas) {
-                        // Existing draw logic...
+                        int maxY = (int) Math.min(parentAlert.getCommentTextViewTop() + currentPanTranslationY + parentAlert.getContainerView().getTranslationY() - cameraView.getTranslationY(), getMeasuredHeight());
+                        if (cameraOpened) {
+                            maxY = getMeasuredHeight();
+                        } else if (cameraAnimationInProgress) {
+                            maxY = AndroidUtilities.lerp(maxY, getMeasuredHeight(), cameraOpenProgress);
+                        }
+                        int w = cameraDrawable.getIntrinsicWidth();
+                        int h = cameraDrawable.getIntrinsicHeight();
+                        int x = (itemSize - w) / 2;
+                        int y = (itemSize - h) / 2;
+                        if (cameraViewOffsetY != 0) {
+                            y -= cameraViewOffsetY;
+                        }
+                        boolean clip = maxY < getMeasuredHeight();
+                        if (clip) {
+                            canvas.save();
+                            canvas.clipRect(0, 0, getMeasuredWidth(), maxY);
+                        }
+                        cameraDrawable.setBounds(x, y, x + w, y + h);
+                        cameraDrawable.draw(canvas);
+                        if (clip) {
+                            canvas.restore();
+                        }
                     }
                 };
                 cameraIcon.setWillNotDraw(false);
