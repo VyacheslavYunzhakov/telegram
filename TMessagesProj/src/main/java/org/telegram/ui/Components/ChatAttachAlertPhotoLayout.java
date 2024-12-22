@@ -1288,12 +1288,24 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 insetBottomAdjusted = bottom - top - bottomMargin;
 
                 final int w = right - left;
-                final int h = bottom - top;
+                final int h = insetBottomAdjusted - insetTopAdjusted;
 
-                actionBarContainer.layout(0, t, previewW, t + actionBarContainer.getMeasuredHeight());
-                controlContainer.layout(0, previewH - controlContainer.getMeasuredHeight(), previewW, previewH);
-                navbarContainer.layout(0, previewH, previewW, previewH + navbarContainer.getMeasuredHeight());
-                flashViews.foregroundView.layout(0, 0, w, h);
+                // Position child views within the adjusted bounds
+                actionBarContainer.layout(0, insetTopAdjusted, previewW, insetTopAdjusted + actionBarContainer.getMeasuredHeight());
+//                actionBarContainer.layout(0, 0, previewW, actionBarContainer.getMeasuredHeight());
+                controlContainer.layout(
+                        0,
+                        insetBottomAdjusted - controlContainer.getMeasuredHeight(),
+                        previewW,
+                        insetBottomAdjusted
+                );
+                navbarContainer.layout(
+                        0,
+                        insetBottomAdjusted,
+                        previewW,
+                        insetBottomAdjusted + navbarContainer.getMeasuredHeight()
+                );
+                flashViews.foregroundView.layout(0, 0, w, h + insetBottomAdjusted);
                 captionContainer.layout(0, insetBottomAdjusted - previewH, previewW, insetBottomAdjusted);
                 if (captionEditOverlay != null) {
                     captionEditOverlay.layout(0, 0, w, h);
@@ -3870,8 +3882,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             setSystemUiVisibility(flags);
 
             cameraPanel.measure(
-                    MeasureSpec.makeMeasureSpec(previewW, MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(previewH + underControls, MeasureSpec.EXACTLY)
+                    MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
             );
             collageLayoutView.measure(
                     MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
@@ -3962,7 +3974,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 b = t + previewH + underControls;
             }
 
-            cameraPanel.layout(l, t, r, b);
+            cameraPanel.layout(0, 0, W, H);
             collageLayoutView.layout(0, 0, W, H);
             flashViews.backgroundView.layout(0, 0, W, H);
             if (thanosEffect != null) {
@@ -4536,6 +4548,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     }
 
     protected void openPhotoViewer(MediaController.PhotoEntry entry, final boolean sameTakePictureOrientation, boolean external) {
+        flashViews.previewEnd();
         if (entry != null) {
             cameraPhotos.add(entry);
             selectedPhotos.put(entry.imageId, entry);
