@@ -5041,6 +5041,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
         if (!parentAlert.destroyed && parentAlert.isShowing() && deviceHasGoodCamera && parentAlert.getBackDrawable().getAlpha() != 0 && !cameraOpened) {
             showCamera();
+        } else if (cameraView != null && cameraView.isDual()) {
+            cameraView.resetCamera();
         }
     }
 
@@ -5140,6 +5142,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
         AndroidUtilities.lockOrientation(parentAlert.baseFragment.getParentActivity(), ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         recordControl.updateGalleryImage();
+        setCameraFlashModeIcon(getCurrentFlashMode(), true);
     }
 
     public void loadGalleryPhotos() {
@@ -5164,7 +5167,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
         if (cameraView == null) {
             final boolean lazy = !LiteMode.isEnabled(LiteMode.FLAGS_CHAT);
-            cameraView = new DualCameraView(getContext(), getCameraFace(), lazy) {
+            cameraView = new DualCameraView(getContext(), false, lazy) {
 
                 Bulletin.Delegate bulletinDelegate = new Bulletin.Delegate() {
                     @Override
