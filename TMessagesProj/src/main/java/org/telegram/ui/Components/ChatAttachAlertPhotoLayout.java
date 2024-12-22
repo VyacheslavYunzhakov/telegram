@@ -82,6 +82,7 @@ import android.widget.TextView;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.dynamicanimation.animation.DynamicAnimation;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -1280,30 +1281,19 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 // Convert dp to pixels for margins
                 int topMargin = (int) (48 * getContext().getResources().getDisplayMetrics().density);
                 int bottomMargin = (int) (90 * getContext().getResources().getDisplayMetrics().density);
+                final int t = underStatusBar ? insetTop : 0;
 
                 // Adjust layout boundaries
                 insetTopAdjusted = underStatusBar ? insetTop + topMargin : topMargin;
                 insetBottomAdjusted = bottom - top - bottomMargin;
 
                 final int w = right - left;
-                final int h = insetBottomAdjusted - insetTopAdjusted;
+                final int h = bottom - top;
 
-                // Position child views within the adjusted bounds
-                actionBarContainer.layout(0, insetTopAdjusted, previewW, insetTopAdjusted + actionBarContainer.getMeasuredHeight());
-//                actionBarContainer.layout(0, 0, previewW, actionBarContainer.getMeasuredHeight());
-                controlContainer.layout(
-                        0,
-                        insetBottomAdjusted - controlContainer.getMeasuredHeight(),
-                        previewW,
-                        insetBottomAdjusted
-                );
-                navbarContainer.layout(
-                        0,
-                        insetBottomAdjusted,
-                        previewW,
-                        insetBottomAdjusted + navbarContainer.getMeasuredHeight()
-                );
-                flashViews.foregroundView.layout(0, 0, w, h + insetBottomAdjusted);
+                actionBarContainer.layout(0, t, previewW, t + actionBarContainer.getMeasuredHeight());
+                controlContainer.layout(0, previewH - controlContainer.getMeasuredHeight(), previewW, previewH);
+                navbarContainer.layout(0, previewH, previewW, previewH + navbarContainer.getMeasuredHeight());
+                flashViews.foregroundView.layout(0, 0, w, h);
                 captionContainer.layout(0, insetBottomAdjusted - previewH, previewW, insetBottomAdjusted);
                 if (captionEditOverlay != null) {
                     captionEditOverlay.layout(0, 0, w, h);
@@ -1461,15 +1451,18 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
         windowView = new WindowView(context);
         if (Build.VERSION.SDK_INT >= 21) {
-            windowView.setFitsSystemWindows(false);
+            windowView.setFitsSystemWindows(true);
             windowView.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
                 @NonNull
                 @Override
                 public WindowInsets onApplyWindowInsets(@NonNull View v, @NonNull WindowInsets insets) {
-                    insetTop = 0;
-                    insetBottom = 0;
-                    insetLeft = 0;
-                    insetRight = 0;
+                    final WindowInsetsCompat insetsCompat = WindowInsetsCompat.toWindowInsetsCompat(insets, v);
+                    final androidx.core.graphics.Insets i = insetsCompat.getInsets(WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.systemBars());
+                    insetTop    = Math.max(i.top, insets.getStableInsetTop());
+                    insetBottom = Math.max(i.bottom, insets.getStableInsetBottom());
+                    insetLeft   = Math.max(i.left, insets.getStableInsetLeft());
+                    insetRight  = Math.max(i.right, insets.getStableInsetRight());
+                    insetTop = Math.max(insetTop, AndroidUtilities.statusBarHeight);
                     windowView.requestLayout();
                     if (Build.VERSION.SDK_INT >= 30) {
                         return WindowInsets.CONSUMED;
@@ -3859,19 +3852,22 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             underControls = dp(48);
             if (hFromW + underControls <= H - navbar) {
                 previewW = w;
-                previewH = H;
+                previewH = hFromW;
                 underStatusBar = previewH + underControls > H - navbar - statusbar;
             } else {
                 underStatusBar = false;
-                previewH = H;
-                previewW = w;
+                previewH = H - underControls - navbar - statusbar;
+                previewW = (int) Math.ceil(previewH * 9f / 16f);
             }
             underControls = Utilities.clamp(H - previewH - (underStatusBar ? 0 : statusbar), dp(68), dp(48));
 
-            setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-                            View.SYSTEM_UI_FLAG_FULLSCREEN
-            );
+            int flags = getSystemUiVisibility();
+            if (underStatusBar) {
+                flags |= View.SYSTEM_UI_FLAG_FULLSCREEN;
+            } else {
+                flags &= ~View.SYSTEM_UI_FLAG_FULLSCREEN;
+            }
+            setSystemUiVisibility(flags);
 
             cameraPanel.measure(
                     MeasureSpec.makeMeasureSpec(previewW, MeasureSpec.EXACTLY),
@@ -3966,7 +3962,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 b = t + previewH + underControls;
             }
 
-            cameraPanel.layout(0, 0, W, H);
+            cameraPanel.layout(l, t, r, b);
             collageLayoutView.layout(0, 0, W, H);
             flashViews.backgroundView.layout(0, 0, W, H);
             if (thanosEffect != null) {
