@@ -5054,7 +5054,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
         if (!parentAlert.destroyed && parentAlert.isShowing() && deviceHasGoodCamera && parentAlert.getBackDrawable().getAlpha() != 0 && !cameraOpened) {
             showCamera();
-        } else if (cameraView != null && cameraView.isDual()) {
+        } else if (cameraView != null) {
             cameraView.resetCamera();
         }
     }
@@ -6626,6 +6626,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     }
 
     private void resumeCameraPreview() {
+        videoTimerView.setDuration(0, true);
         try {
             checkCamera(false);
             if (cameraView != null) {
